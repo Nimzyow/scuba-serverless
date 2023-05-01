@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+    scuba
+
+    Sample SAM Template for scuba
+
+Globals:
+    Function:
+        CodeUri: ./
+        Timeout: 30
+        Runtime: nodejs16.x
+        MemorySize: 1024
+        Tracing: Active
+        Architectures:
+            - x86_64
+        Environment:
+            Variables:
+                TABLE_NAME: !Ref DynamoDBTable
+
+Resources:
+    CreateUserFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: !Sub ${AWS::StackName}-CreateUser
+            Handler: src/handlers/createUser.handler
+            Events:
+                HttpPost:
+                    Type: Api
+                    Properties:
+                        Path: /users
+                        Method: post
+            Policies:
+                - DynamoDBWritePolicy:
+                      TableName: !Ref DynamoDBTable
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: "es2020"
+                EntryPoints:
+                    - src/handlers/createUser.ts
+    UpdateUserFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: !Sub ${AWS::StackName}-UpdateUser
+            Handler: src/handlers/updateUser.handler
+            Events:
+                HttpUpdate:
+                    Type: Api
+                    Properties:
+                        Path: /users/{userId}
+                        Method: patch
+            Policies:
+                - DynamoDBWritePolicy:
+                      TableName: !Ref DynamoDBTable
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: "es2020"
+                EntryPoints:
+                    - src/handlers/updateUser.ts
+    UpdateStripeCustomerFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: !Sub ${AWS::StackName}-UpdateStripeCustomer
+            Handler: src/handlers/updateStripeCustomer.handler
+            Events:
+                DynamoDBStream:
+                    Type: DynamoDB
+                    Properties:
+                        Stream: !GetAtt DynamoDBTable.StreamArn
+                        StartingPosition: TRIM_HORIZON
+                        BatchSize: 1
+            Policies:
+                - DynamoDBWritePolicy:
+                      TableName: !Ref DynamoDBTable
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: "es2020"
+                EntryPoints:
+                    - src/handlers/updateStripeCustomer.ts
+    CreatePaymentPlanForUserFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            FunctionName: !Sub ${AWS::StackName}-CreatePaymentPlanForUser
+            Handler: src/handlers/createPaymentPlanForUser.handler
+            Events:
+                HttpPost:
+                    Type: Api
+                    Properties:
+                        Path: /users/{userId}/payment-plans
+                        Method: post
+            Policies:
+                - DynamoDBWritePolicy:
+                      TableName: !Ref DynamoDBTable
+        Metadata:
+            BuildMethod: esbuild
+            BuildProperties:
+                Minify: true
+                Target: "es2020"
+                EntryPoints:
+                    - src/handlers/createPaymentPlanForUser.ts
+
+    DynamoDBTable:
+        Type: AWS::DynamoDB::Table
+        Properties:
+            AttributeDefinitions:
+                - AttributeName: PK
+                  AttributeType: S
+                - AttributeName: SK
+                  AttributeType: S
+            KeySchema:
+                - AttributeName: PK
+                  KeyType: HASH
+                - AttributeName: SK
+                  KeyType: RANGE
+            ProvisionedThroughput:
+                ReadCapacityUnits: 5
+                WriteCapacityUnits: 5
+            StreamSpecification:
+                StreamViewType: NEW_AND_OLD_IMAGES
+
+Outputs:
+    APIEndpoint:
+        Description: "API Gateway endpoint URL for Prod stage"
+        Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+    CreateUserFunctionArn:
+        Description: "Create user lambda funcion ARN"
+        Value: !GetAtt CreateUserFunction.Arn
+    TableName:
+        Description: "Name of the DynamoDB table"
+        Value: !Ref DynamoDBTable

@@ -1,0 +1,11 @@
+version = 0.1
+[default]
+
+[default.global.parameters]
+stack_name = "ripple-payment"
+
+[default.sync.parameters]
+profile = "ripple_sandbox"
+
+[default.logs.parameters]
+profile = "ripple_sandbox"
